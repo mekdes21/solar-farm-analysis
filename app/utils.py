@@ -3,26 +3,23 @@ import pandas as pd
 import streamlit as st
 
 
+# Cache the data loading to avoid reloading on each Streamlit rerun
 @st.cache_data
 def load_data(file_path):
     if not os.path.exists(file_path):
         st.error(f"File not found: {file_path}")
-        return pd.DataFrame({'Timestamp': [], 'Country': [], 'GHI': [], 'DNI': [], 'DHI': []})  # Return structure even if the file isn't found
+        return pd.DataFrame({'Timestamp': [], 'Country': [], 'GHI': [], 'DNI': [], 'DHI': []})  # Return structure if the file isn't found
 
     try:
-        # Load data
-        data = pd.read_csv(file_path)
-        
-        # Check if required column exists
-        if 'Timestamp' not in data.columns:
-            st.error("Missing 'Timestamp' column in the dataset.")
-            return pd.DataFrame()
+        # Only load necessary columns
+        cols = ['Timestamp', 'Country', 'GHI', 'DNI', 'DHI']
+        data = pd.read_csv(file_path, usecols=cols)
 
-        # Parse 'Timestamp', round to remove fractional seconds
-        data['Timestamp'] = pd.to_datetime(data['Timestamp'], errors='coerce').dt.round('s')  # Round to nearest second
-        data.dropna(subset=['Timestamp'], inplace=True)  # Drop rows with invalid timestamps
+        # Ensure Timestamp parsing and drop invalid ones
+        data['Timestamp'] = pd.to_datetime(data['Timestamp'], errors='coerce').dt.floor('s')
+        data.dropna(subset=['Timestamp'], inplace=True)
 
-        # Inform the user that the data is loaded
+        # Log success to the user
         st.info(f"Loaded {len(data)} rows of data from {file_path}.")
         
         return data
