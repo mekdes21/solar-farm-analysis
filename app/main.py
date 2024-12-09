@@ -1,12 +1,20 @@
 import streamlit as st
+import pandas as pd
 import datetime
-from app.utils import load_data
+from utils import load_data
+import matplotlib.pyplot as plt
+
+
 
 # Constants
-FILE_PATH = '../src/combined_solar_data.csv'
+FILE_PATH = './src/combined_solar_data.csv'
 
 # Load Data
 combined_data = load_data(FILE_PATH)
+# Stop execution if data isn't loaded properly
+if combined_data.empty:
+    st.error("Data not loaded properly. Check file path or data file.")
+    st.stop()
 
 # Streamlit App Title
 st.title("Solar Radiation Analysis Dashboard")
