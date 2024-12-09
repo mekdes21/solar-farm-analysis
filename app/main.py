@@ -1,33 +1,102 @@
 import streamlit as st
+import pandas as pd
+from utils import load_data
 import matplotlib.pyplot as plt
-import seaborn as sns
-from app.utils import load_data, filter_data
+
+# Set page layout to full screen
+st.set_page_config(layout="wide")  # Ensures the app uses the full browser width
+
+# Constants
+FILE_PATH = './src/combined_solar_data.csv'
+
+# Load Data
+combined_data = load_data(FILE_PATH)
+
+if combined_data.empty:
+    st.error("Data not loaded properly. Check file path or data file.")
+    st.stop()
+
+# Streamlit App Title
+st.title("Solar Radiation Analysis Dashboard")
+st.markdown("""
+    Explore trends in solar radiation across various countries, dates, and metrics such as GHI, DNI, DHI.
+    Use the interactive filters and tabs to view visualizations and statistical insights.
+""")
+
+# Filters Section
+st.header("🛠️ Filter Options")
+with st.expander("Select Date Range and Country for Analysis"):
+    # Sidebar-like behavior but scrollable instead
+    date_range = st.date_input(
+        "Select Date Range:",
+        [combined_data['Timestamp'].min().date(), combined_data['Timestamp'].max().date()],
+        min_value=combined_data['Timestamp'].min().date(),
+        max_value=combined_data['Timestamp'].max().date()
+    )
+    country_filter = st.selectbox(
+        "Select Country",
+        options=["All"] + combined_data['Country'].unique().tolist()
+    )
+
+# Efficient Data Filtering with caching
+@st.cache_data
+def compute_filtered_data(data, date_range, country):
+    filtered = data[
+        (data['Timestamp'] >= pd.Timestamp(date_range[0])) &
+        (data['Timestamp'] <= pd.Timestamp(date_range[1]))
+    ]
+    if country != "All":
+        filtered = filtered[filtered["Country"] == country]
+    return filtered
 
 
-# Title
-st.title("🌞 Solar Radiation Analysis Dashboard")
+filtered_data = compute_filtered_data(combined_data, date_range, country_filter)
 
-# Load data
-data = load_data()
+# Main Tabs
+st.header("📊 Analysis")
+tabs = st.tabs(["Individual Analysis", "Comparative Analysis", "Summary"])
 
-# Sidebar Interactivity
-st.sidebar.header("Filters")
-country = st.sidebar.selectbox("Select Country", ["All", "Benin", "Sierra Leone", "Togo"])
-metric = st.sidebar.selectbox("Select Metric", ["GHI", "DNI", "DHI"])
+# Individual Analysis
+with tabs[0]:
+    st.subheader("🌞 Individual Analysis")
+    with st.expander("View Solar Radiation Trends for Selected Country"):
+        country = st.selectbox(
+            "Select Country for Analysis",
+            options=["All"] + combined_data['Country'].unique().tolist()
+        )
+        if country != "All":
+            country_data = filtered_data[filtered_data["Country"] == country]
+        else:
+            country_data = filtered_data
+        # Resampled visualization for clarity and better performance
+        downsampled_data = country_data.set_index('Timestamp')[['GHI', 'DNI', 'DHI']].resample('1D').mean().dropna()
+        st.line_chart(downsampled_data)
 
-# Filter data based on selection
-filtered_data = filter_data(data, country, metric)
+# Comparative Analysis
+with tabs[1]:
+    st.subheader("🌍 Comparative Analysis")
+    with st.expander("Comparison Across Multiple Countries Using Averages"):
+        @st.cache_data
+        def aggregate_mean(data):
+            return data.groupby('Country')[['GHI', 'DNI', 'DHI']].mean()
 
-# Line chart visualization
-st.subheader("Solar Radiation Over Time")
-st.line_chart(
-    filtered_data.set_index("Timestamp")[metric],
-    use_container_width=True
-)
+        mean_values = aggregate_mean(filtered_data)
+        st.bar_chart(mean_values)
 
-# Additional visualizations with Seaborn
-st.subheader("Visual Insights")
-fig, ax = plt.subplots(figsize=(10, 6))
-sns.lineplot(x="Timestamp", y=metric, data=filtered_data, ax=ax)
-plt.xticks(rotation=45)
-st.pyplot(fig)
+# Summary Tab
+with tabs[2]:
+    st.subheader("📊 Summary Statistics")
+    with st.expander("View Statistical Insights About Your Data"):
+        @st.cache_data
+        def compute_summary(data):
+            return data.describe()
+
+        summary_stats = compute_summary(filtered_data)
+        st.write(summary_stats)
+
+# Footer
+st.markdown("---")
+st.info("""
+    Data visualizations powered by Streamlit.
+    All solar radiation trends and insights are computed dynamically.
+""")

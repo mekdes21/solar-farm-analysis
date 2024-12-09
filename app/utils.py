@@ -1,27 +1,28 @@
+import os
 import pandas as pd
+import streamlit as st
 
 
-def load_data():
-    """
-    Load the dataset from a source file.
-    Returns the loaded DataFrame.
-    """
-    data_path = "../src/combined_solar_data.csv"
-    data = pd.read_csv(data_path)
-    return data
+# Cache the data loading to avoid reloading on each Streamlit rerun
+@st.cache_data
+def load_data(file_path):
+    if not os.path.exists(file_path):
+        st.error(f"File not found: {file_path}")
+        return pd.DataFrame({'Timestamp': [], 'Country': [], 'GHI': [], 'DNI': [], 'DHI': []})  # Return structure if the file isn't found
 
+    try:
+        # Only load necessary columns
+        cols = ['Timestamp', 'Country', 'GHI', 'DNI', 'DHI']
+        data = pd.read_csv(file_path, usecols=cols)
 
-def filter_data(data, country="All", metric="GHI"):
-    """
-    Filter data based on user selection.
-    Args:
-        data: The raw data
-        country: Country name or 'All' to show all data
-        metric: Selected metric for visualization
+        # Ensure Timestamp parsing and drop invalid ones
+        data['Timestamp'] = pd.to_datetime(data['Timestamp'], errors='coerce').dt.floor('s')
+        data.dropna(subset=['Timestamp'], inplace=True)
 
-    Returns:
-        Filtered data subset
-    """
-    if country != "All":
-        data = data[data["Country"] == country]
-    return data
+        # Log success to the user
+        st.info(f"Loaded {len(data)} rows of data from {file_path}.")
+        
+        return data
+    except Exception as e:
+        st.error(f"An error occurred while loading data: {e}")
+        return pd.DataFrame()
