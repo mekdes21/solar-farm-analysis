@@ -1,27 +1,17 @@
 import pandas as pd
+import streamlit as st
 
-
-def load_data():
+@st.cache
+def load_data(file_path: str) -> pd.DataFrame:
     """
-    Load the dataset from a source file.
-    Returns the loaded DataFrame.
-    """
-    data_path = "../src/combined_solar_data.csv"
-    data = pd.read_csv(data_path)
-    return data
-
-
-def filter_data(data, country="All", metric="GHI"):
-    """
-    Filter data based on user selection.
+    Loads the dataset and processes the Timestamp column.
+    
     Args:
-        data: The raw data
-        country: Country name or 'All' to show all data
-        metric: Selected metric for visualization
+        file_path (str): Path to the CSV file.
 
     Returns:
-        Filtered data subset
+        pd.DataFrame: Processed dataset.
     """
-    if country != "All":
-        data = data[data["Country"] == country]
+    data = pd.read_csv(file_path)
+    data['Timestamp'] = pd.to_datetime(data['Timestamp'])  # Convert to datetime
     return data
